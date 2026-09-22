@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Variables de entorno
+.env
+**/.env
+
+# Builds
+dist/
+**/dist/
+
+# Notas locales
+_notas_locales/
+
+# Logs
+*.loggit
