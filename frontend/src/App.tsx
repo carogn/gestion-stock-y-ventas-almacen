@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
+type Categoria = {
+  id: number;
+  nombre: string;
+  activo: boolean;
+};
+
 type Producto = {
   id: number;
   nombre: string;
@@ -8,11 +14,13 @@ type Producto = {
   stock: number;
   stockMinimo: number;
   activo: boolean;
+  categoriaId: number | null;
+  categoria?: Categoria | null;
 };
 
 function App() {
   const [productos, setProductos] = useState<Producto[]>([]);
-
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [nombre, setNombre] = useState("");
   const [precio, setPrecio] = useState("");
   const [stock, setStock] = useState("");
@@ -20,6 +28,15 @@ function App() {
   const [productoVentaId, setProductoVentaId] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState("");
   const [mensajeVenta, setMensajeVenta] = useState("");
+  const [categoriaId, setCategoriaId] = useState("");
+  const [productoEditandoId, setProductoEditandoId] = useState<number | null>(null);
+  const [nombreEdit, setNombreEdit] = useState("");
+  const [precioEdit, setPrecioEdit] = useState("");
+  const [stockMinimoEdit, setStockMinimoEdit] = useState("");
+  const [categoriaEditId, setCategoriaEditId] = useState("");
+  const [productoReposicionId, setProductoReposicionId] = useState<number | null>(null);
+  const [cantidadReposicion, setCantidadReposicion] = useState("");
+  const [mensajeReposicion, setMensajeReposicion] = useState("");
 
   // Traigo los productos desde el backend
   const cargarProductos = () => {
@@ -30,7 +47,8 @@ function App() {
   };
 
   useEffect(() => {
-    cargarProductos();
+  cargarProductos();
+  cargarCategorias();
   }, []);
 
   // Creo un producto nuevo desde el formulario
@@ -48,6 +66,7 @@ function App() {
           precio: Number(precio),
           stock: Number(stock),
           stockMinimo: Number(stockMinimo),
+          categoriaId: Number(categoriaId),
         }),
       });
 
@@ -60,11 +79,22 @@ function App() {
       setPrecio("");
       setStock("");
       setStockMinimo("");
+      setCategoriaId("");
 
       cargarProductos();
     } catch (error) {
       console.error("Error al crear producto:", error);
     }
+  };
+
+  // Traigo las categorías desde el backend
+  const cargarCategorias = () => {
+    fetch("http://localhost:3000/categorias")
+      .then((response) => response.json())
+      .then((data) => setCategorias(data))
+      .catch((error) =>
+        console.error("Error al cargar categorías:", error)
+      );
   };
 
   // Registro una venta usando el endpoint del backend
@@ -100,6 +130,123 @@ function App() {
       setMensajeVenta("Error al registrar la venta");
     }
   };
+
+  // Cargo los datos del producto que quiero editar
+  const seleccionarProductoParaEditar = (producto: Producto) => {
+    setProductoEditandoId(producto.id);
+    setNombreEdit(producto.nombre);
+    setPrecioEdit(producto.precio);
+    setStockMinimoEdit(String(producto.stockMinimo));
+    setCategoriaEditId(
+      producto.categoriaId !== null ? String(producto.categoriaId) : ""
+    );
+  };
+
+  // Actualizo los datos del producto seleccionado
+  const editarProducto = async (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (productoEditandoId === null) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3000/productos/${productoEditandoId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre: nombreEdit,
+            precio: Number(precioEdit),
+            stockMinimo: Number(stockMinimoEdit),
+            categoriaId: Number(categoriaEditId),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("No se pudo editar el producto");
+      }
+
+      setProductoEditandoId(null);
+      setNombreEdit("");
+      setPrecioEdit("");
+      setStockMinimoEdit("");
+      setCategoriaEditId("");
+
+      cargarProductos();
+    } catch (error) {
+      console.error("Error al editar producto:", error);
+    }
+  };
+
+  const desactivarProducto = async (id: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3000/productos/${id}/desactivar`,
+        {
+          method: "PATCH",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "No se pudo desactivar el producto");
+        return;
+      }
+
+      cargarProductos();
+    } catch (error) {
+      console.error("Error al desactivar producto:", error);
+    }
+  };
+
+  const reponerStock = async (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (productoReposicionId === null) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3000/productos/${productoReposicionId}/reponer`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            cantidad: Number(cantidadReposicion),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMensajeReposicion(
+          data.message || "No se pudo reponer el stock"
+        );
+        return;
+      }
+
+      setMensajeReposicion("Stock repuesto correctamente");
+      setCantidadReposicion("");
+      setProductoReposicionId(null);
+
+      cargarProductos();
+    } catch (error) {
+      console.error("Error al reponer stock:", error);
+      setMensajeReposicion("Error al reponer el stock");
+    }
+  };
+
+  
 
   return (
     <main>
@@ -153,6 +300,24 @@ function App() {
             />
           </div>
 
+          <div>
+            <label>Categoría</label>
+
+            <select
+              value={categoriaId}
+              onChange={(event) => setCategoriaId(event.target.value)}
+              required
+            >
+              <option value="">Seleccionar categoría</option>
+
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.id}>
+                  {categoria.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button type="submit">Crear producto</button>
         </form>
       </section>
@@ -172,10 +337,12 @@ function App() {
               >
                 <option value="">Seleccionar producto</option>
 
-                {productos.map((producto) => (
-                  <option key={producto.id} value={producto.id}>
-                    {producto.nombre} - Stock: {producto.stock}
-                  </option>
+                {productos
+                  .filter((producto) => producto.activo)
+                  .map((producto) => (
+                    <option key={producto.id} value={producto.id}>
+                      {producto.nombre} - Stock: {producto.stock}
+                    </option>
                 ))}
               </select>
             </div>
@@ -198,6 +365,43 @@ function App() {
           {mensajeVenta && <p>{mensajeVenta}</p>}
       </section>
 
+      {productoReposicionId !== null && (
+        <section>
+          <h2>Reponer stock</h2>
+
+          <form onSubmit={reponerStock}>
+            <div>
+              <label>Cantidad</label>
+              <input
+                type="number"
+                value={cantidadReposicion}
+                onChange={(event) => setCantidadReposicion(event.target.value)}
+                min="1"
+                step="1"
+                required
+              />
+            </div>
+
+            <button type="submit">
+              Confirmar reposición
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setProductoReposicionId(null);
+                setCantidadReposicion("");
+                setMensajeReposicion("");
+              }}
+            >
+              Cancelar
+            </button>
+          </form>
+
+          {mensajeReposicion && <p>{mensajeReposicion}</p>}
+        </section>
+      )}
+
       <section>
         <h2>Productos</h2>
 
@@ -208,11 +412,111 @@ function App() {
             {productos.map((producto) => (
               <li key={producto.id}>
                 {producto.nombre} - ${producto.precio} - Stock: {producto.stock}
+                {" - "}
+                Categoría: {producto.categoria?.nombre ?? "Sin categoría"}
+                {" - "}
+                Estado: {producto.activo ? "Activo" : "Inactivo"}
+
+                <button
+                  type="button"
+                  onClick={() => seleccionarProductoParaEditar(producto)}
+                >
+                  Editar
+                </button>
+
+                {producto.activo && (
+                  <button
+                    type="button"
+                    onClick={() => desactivarProducto(producto.id)}
+                  >
+                    Desactivar
+                  </button> 
+
+                )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductoReposicionId(producto.id);
+                      setCantidadReposicion("");
+                      setMensajeReposicion("");
+                    }}
+                  >
+                    Reponer stock
+                  </button>
+
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {productoEditandoId !== null && (
+      <section>
+        <h2>Editar producto</h2>
+
+        <form onSubmit={editarProducto}>
+          <div>
+            <label>Nombre</label>
+            <input
+              type="text"
+              value={nombreEdit}
+              onChange={(event) => setNombreEdit(event.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label>Precio</label>
+            <input
+              type="number"
+              value={precioEdit}
+              onChange={(event) => setPrecioEdit(event.target.value)}
+              min="0"
+              step="0.01"
+              required
+            />
+          </div>
+
+          <div>
+            <label>Stock mínimo</label>
+            <input
+              type="number"
+              value={stockMinimoEdit}
+              onChange={(event) => setStockMinimoEdit(event.target.value)}
+              min="0"
+              required
+            />
+          </div>
+
+          <div>
+            <label>Categoría</label>
+            <select
+              value={categoriaEditId}
+              onChange={(event) => setCategoriaEditId(event.target.value)}
+              required
+            >
+              <option value="">Seleccionar categoría</option>
+
+              {categorias.map((categoria) => (
+                <option key={categoria.id} value={categoria.id}>
+                  {categoria.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button type="submit">Guardar cambios</button>
+
+          <button
+            type="button"
+            onClick={() => setProductoEditandoId(null)}
+          >
+            Cancelar
+          </button>
+        </form>
+      </section>
+    )}
     </main>
   );
 }

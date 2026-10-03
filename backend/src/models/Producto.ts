@@ -9,6 +9,7 @@ class Producto extends Model {
   public stock!: number;
   public stockMinimo!: number;
   public activo!: boolean;
+  public categoriaId!: number;
 }
 
 // Definición de la tabla productos
@@ -42,6 +43,11 @@ Producto.init(
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: true,
+    },
+    categoriaId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "categoria_id",
     },
   },
   {

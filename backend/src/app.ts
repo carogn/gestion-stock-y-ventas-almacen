@@ -5,6 +5,7 @@ import database from "./config/database";
 import "./models";
 import productoRoutes from "./routes/productoRoutes";
 import ventaRoutes from "./routes/ventaRoutes";
+import categoriaRoutes from "./routes/categoriaRoutes";
 
 // Variables de entorno
 dotenv.config();
@@ -19,6 +20,8 @@ app.use(express.json());
 app.use("/productos", productoRoutes);
 // Rutas de ventas
 app.use("/ventas", ventaRoutes);
+// Rutas de categorias
+app.use("/categorias", categoriaRoutes);
 
 // Para chequear rápido que levante la API
 app.get("/", (_req, res) => {

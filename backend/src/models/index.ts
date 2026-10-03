@@ -1,6 +1,7 @@
 import Producto from "./Producto";
 import Venta from "./Venta";
 import DetalleVenta from "./DetalleVenta";
+import Categoria from "./Categoria";
 
 // Una venta puede tener varios productos
 Venta.hasMany(DetalleVenta, {
@@ -24,4 +25,15 @@ DetalleVenta.belongsTo(Producto, {
   as: "producto",
 });
 
-export { Producto, Venta, DetalleVenta };
+// Una categoria puede tener varios productos
+Categoria.hasMany(Producto, {
+  foreignKey: "categoriaId",
+  as: "productos",
+});
+
+Producto.belongsTo(Categoria, {
+  foreignKey: "categoriaId",
+  as: "categoria",
+});
+
+export { Producto, Venta, DetalleVenta, Categoria };

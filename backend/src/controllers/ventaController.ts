@@ -20,6 +20,15 @@ export const crearVenta = async (req: Request, res: Response) => {
       });
     }
 
+    // No permito vender productos inactivos
+    if (!producto.activo) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: "El producto se encuentra inactivo",
+      });
+    }
+
     // Valido que la cantidad sea correcta
     if (!cantidad || cantidad <= 0) {
       await transaction.rollback();
