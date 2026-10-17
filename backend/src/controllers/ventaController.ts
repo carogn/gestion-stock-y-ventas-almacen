@@ -2,83 +2,113 @@ import { Request, Response } from "express";
 import database from "../config/database";
 import { Producto, Venta, DetalleVenta } from "../models";
 
-// Registra una venta simple de un producto
+// Registra una venta con uno o más productos
 export const crearVenta = async (req: Request, res: Response) => {
   const transaction = await database.transaction();
 
   try {
-    const { productoId, cantidad } = req.body;
+    const { items } = req.body;
 
-    // Busco el producto que se quiere vender
-    const producto = await Producto.findByPk(productoId, { transaction });
-
-    if (!producto) {
-      await transaction.rollback();
-
-      return res.status(404).json({
-        message: "Producto no encontrado",
-      });
-    }
-
-    // No permito vender productos inactivos
-    if (!producto.activo) {
+    // Valido que venga al menos un producto
+    if (!Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
 
       return res.status(400).json({
-        message: "El producto se encuentra inactivo",
+        message: "La venta debe contener al menos un producto",
       });
     }
 
-    // Valido que la cantidad sea correcta
-    if (!cantidad || cantidad <= 0) {
-      await transaction.rollback();
+    const detallesPreparados = [];
+    let totalVenta = 0;
 
-      return res.status(400).json({
-        message: "La cantidad debe ser mayor a 0",
-      });
-    }
+    // Primero valido todos los productos antes de guardar la venta
+    for (const item of items) {
+      const { productoId, cantidad } = item;
 
-    // No permito vender más unidades de las disponibles
-    if (producto.stock < cantidad) {
-      await transaction.rollback();
+      // Valido la cantidad
+      if (!Number.isInteger(cantidad) || cantidad <= 0) {
+        await transaction.rollback();
 
-      return res.status(400).json({
-        message: "Stock insuficiente",
-      });
-    }
+        return res.status(400).json({
+          message: "La cantidad debe ser un número entero mayor a 0",
+        });
+      }
 
-    const precioUnitario = Number(producto.precio);
-    const subtotal = precioUnitario * cantidad;
+      // Busco el producto
+      const producto = await Producto.findByPk(productoId, { transaction });
 
-    // Primero creo la cabecera de la venta
-    const venta = await Venta.create(
-      {
-        total: subtotal,
-      },
-      { transaction }
-    );
+      if (!producto) {
+        await transaction.rollback();
 
-    // Guardo qué producto y cantidad forman parte de la venta
-    await DetalleVenta.create(
-      {
-        ventaId: venta.id,
+        return res.status(404).json({
+          message: `Producto con id ${productoId} no encontrado`,
+        });
+      }
+
+      // No permito vender productos inactivos
+      if (!producto.activo) {
+        await transaction.rollback();
+
+        return res.status(400).json({
+          message: `El producto ${producto.nombre} se encuentra inactivo`,
+        });
+      }
+
+      // Valido stock disponible
+      if (producto.stock < cantidad) {
+        await transaction.rollback();
+
+        return res.status(400).json({
+          message: `Stock insuficiente para ${producto.nombre}`,
+        });
+      }
+
+      const precioUnitario = Number(producto.precio);
+      const subtotal = precioUnitario * cantidad;
+
+      totalVenta += subtotal;
+
+      // Guardo temporalmente la información
+      // todavía no persisto nada
+      detallesPreparados.push({
+        producto,
         productoId: producto.id,
         cantidad,
         precioUnitario,
         subtotal,
+      });
+    }
+
+    // Creo una sola cabecera de venta
+    const venta = await Venta.create(
+      {
+        total: totalVenta,
       },
       { transaction }
     );
 
-    // Descuento del stock las unidades vendidas
-    producto.stock -= cantidad;
+    // Creo los detalles y descuento stock
+    for (const detalle of detallesPreparados) {
+      await DetalleVenta.create(
+        {
+          ventaId: venta.id,
+          productoId: detalle.productoId,
+          cantidad: detalle.cantidad,
+          precioUnitario: detalle.precioUnitario,
+          subtotal: detalle.subtotal,
+        },
+        { transaction }
+      );
 
-    await producto.save({ transaction });
+      detalle.producto.stock -= detalle.cantidad;
 
-    // Confirmo todos los cambios juntos
+      await detalle.producto.save({ transaction });
+    }
+
+    // Confirmo toda la operación
     await transaction.commit();
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Venta registrada correctamente",
       venta,
     });
@@ -87,7 +117,7 @@ export const crearVenta = async (req: Request, res: Response) => {
 
     console.error("Error al registrar la venta:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Error al registrar la venta",
     });
   }

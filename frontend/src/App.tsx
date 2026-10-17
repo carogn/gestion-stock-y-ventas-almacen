@@ -18,6 +18,14 @@ type Producto = {
   categoria?: Categoria | null;
 };
 
+type ItemVenta = {
+  productoId: number;
+  nombre: string;
+  precioUnitario: number;
+  cantidad: number;
+  subtotal: number;
+};
+
 function App() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -28,6 +36,7 @@ function App() {
   const [productoVentaId, setProductoVentaId] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState("");
   const [mensajeVenta, setMensajeVenta] = useState("");
+  const [itemsVenta, setItemsVenta] = useState<ItemVenta[]>([]);
   const [categoriaId, setCategoriaId] = useState("");
   const [productoEditandoId, setProductoEditandoId] = useState<number | null>(null);
   const [nombreEdit, setNombreEdit] = useState("");
@@ -97,9 +106,127 @@ function App() {
       );
   };
 
-  // Registro una venta usando el endpoint del backend
-  const crearVenta = async (event: SyntheticEvent<HTMLFormElement>) => {
+  // Agrego un producto al detalle de la venta
+  const agregarItemVenta = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    const producto = productos.find(
+      (producto) => producto.id === Number(productoVentaId)
+    );
+
+    const cantidad = Number(cantidadVenta);
+
+    if (!producto) {
+      setMensajeVenta("Seleccioná un producto");
+      return;
+    }
+
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+      setMensajeVenta("La cantidad debe ser un número entero mayor a 0");
+      return;
+    }
+
+    if (cantidad > producto.stock) {
+      setMensajeVenta(`Stock insuficiente para ${producto.nombre}`);
+      return;
+    }
+
+    // Por ahora no permito repetir el mismo producto
+    const productoYaAgregado = itemsVenta.some(
+      (item) => item.productoId === producto.id
+    );
+
+    if (productoYaAgregado) {
+      setMensajeVenta("Ese producto ya fue agregado a la venta");
+      return;
+    }
+
+    const precioUnitario = Number(producto.precio);
+    const subtotal = precioUnitario * cantidad;
+
+    const nuevoItem: ItemVenta = {
+      productoId: producto.id,
+      nombre: producto.nombre,
+      precioUnitario,
+      cantidad,
+      subtotal,
+    };
+
+    setItemsVenta([...itemsVenta, nuevoItem]);
+
+    setProductoVentaId("");
+    setCantidadVenta("");
+    setMensajeVenta("");
+  };
+
+  const modificarCantidadItem = (
+    productoId: number,
+    valor: string
+  ) => {
+    const nuevaCantidad = Number(valor);
+
+    if (valor === "") {
+      setItemsVenta(
+        itemsVenta.map((item) =>
+          item.productoId === productoId
+            ? {
+                ...item,
+                cantidad: 0,
+                subtotal: 0,
+              }
+            : item
+        )
+      );
+
+      return;
+    }
+
+    if (!Number.isInteger(nuevaCantidad) || nuevaCantidad <= 0) {
+      return;
+    }
+
+    const producto = productos.find(
+      (producto) => producto.id === productoId
+    );
+
+    if (!producto) {
+      return;
+    }
+
+    if (nuevaCantidad > producto.stock) {
+      setMensajeVenta(`Stock insuficiente para ${producto.nombre}`);
+      return;
+    }
+
+    setItemsVenta(
+      itemsVenta.map((item) =>
+        item.productoId === productoId
+          ? {
+              ...item,
+              cantidad: nuevaCantidad,
+              subtotal: item.precioUnitario * nuevaCantidad,
+            }
+          : item
+      )
+    );
+
+    setMensajeVenta("");
+  };
+
+  // Quito un producto del detalle antes de confirmar
+  const quitarItemVenta = (productoId: number) => {
+    setItemsVenta(
+      itemsVenta.filter((item) => item.productoId !== productoId)
+    );
+  };
+
+
+  // Registro la venta completa
+  const crearVenta = async () => {
+    if (itemsVenta.length === 0) {
+      setMensajeVenta("La venta debe contener al menos un producto");
+      return;
+    }
 
     try {
       const response = await fetch("http://localhost:3000/ventas", {
@@ -107,9 +234,12 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
-          productoId: Number(productoVentaId),
-          cantidad: Number(cantidadVenta),
+          items: itemsVenta.map((item) => ({
+            productoId: item.productoId,
+            cantidad: item.cantidad,
+          })),
         }),
       });
 
@@ -121,9 +251,13 @@ function App() {
       }
 
       setMensajeVenta("Venta registrada correctamente");
+
+      // Limpio la venta actual
+      setItemsVenta([]);
       setProductoVentaId("");
       setCantidadVenta("");
 
+      // Actualizo los stocks mostrados
       cargarProductos();
     } catch (error) {
       console.error("Error al registrar venta:", error);
@@ -323,46 +457,102 @@ function App() {
       </section>
 
       <section>
-
         <h2>Nueva venta</h2>
 
-          <form onSubmit={crearVenta}>
-            <div>
-              <label>Producto</label>
+        <form onSubmit={agregarItemVenta}>
+          <div>
+            <label>Producto</label>
 
-              <select
-                value={productoVentaId}
-                onChange={(event) => setProductoVentaId(event.target.value)}
-                required
-              >
-                <option value="">Seleccionar producto</option>
+            <select
+              value={productoVentaId}
+              onChange={(event) => setProductoVentaId(event.target.value)}
+              required
+            >
+              <option value="">Seleccionar producto</option>
 
-                {productos
-                  .filter((producto) => producto.activo)
-                  .map((producto) => (
-                    <option key={producto.id} value={producto.id}>
-                      {producto.nombre} - Stock: {producto.stock}
-                    </option>
+              {productos
+                .filter((producto) => producto.activo)
+                .map((producto) => (
+                  <option key={producto.id} value={producto.id}>
+                    {producto.nombre} - ${producto.precio} - Stock: {producto.stock}
+                  </option>
                 ))}
-              </select>
-            </div>
+            </select>
+          </div>
 
-            <div>
-              <label>Cantidad</label>
+          <div>
+            <label>Cantidad</label>
 
-              <input
-                type="number"
-                value={cantidadVenta}
-                onChange={(event) => setCantidadVenta(event.target.value)}
-                min="1"
-                required
-              />
-            </div>
+            <input
+              type="number"
+              value={cantidadVenta}
+              onChange={(event) => setCantidadVenta(event.target.value)}
+              min="1"
+              step="1"
+              required
+            />
+          </div>
 
-            <button type="submit">Registrar venta</button>
-          </form>
+          <button type="submit">Agregar producto</button>
+        </form>
 
-          {mensajeVenta && <p>{mensajeVenta}</p>}
+        {itemsVenta.length > 0 && (
+          <div>
+            <h3>Detalle de venta</h3>
+
+            <ul>
+              {itemsVenta.map((item) => (
+                <li key={item.productoId}>
+                  {item.nombre}
+                  {" - "}
+                  Cantidad:
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={item.cantidad}
+                    onChange={(event) =>
+                      modificarCantidadItem(
+                        item.productoId,
+                        event.target.value
+                      )
+                    }
+                  />
+
+                  {" x $"}
+
+                  {item.precioUnitario.toFixed(2)}
+
+                  {" - "}
+
+                  Subtotal: ${item.subtotal.toFixed(2)}
+
+                  <button
+                    type="button"
+                    onClick={() => quitarItemVenta(item.productoId)}
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <p>
+              <strong>
+                Total: $
+                {itemsVenta
+                  .reduce((total, item) => total + item.subtotal, 0)
+                  .toFixed(2)}
+              </strong>
+            </p>
+
+            <button type="button" onClick={crearVenta}>
+              Registrar venta
+            </button>
+          </div>
+        )}
+
+        {mensajeVenta && <p>{mensajeVenta}</p>}
       </section>
 
       {productoReposicionId !== null && (
