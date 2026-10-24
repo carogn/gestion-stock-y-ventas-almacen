@@ -26,58 +26,126 @@ type ItemVenta = {
   subtotal: number;
 };
 
+// Tipo utilizado para representar cada detalle de una venta
+// dentro del historial
+type DetalleVentaHistorial = {
+  id: number;
+  productoId: number;
+  cantidad: number;
+  precioUnitario: string;
+  subtotal: string;
+  producto: {
+    id: number;
+    nombre: string;
+  };
+};
+
+// Tipo utilizado para representar una venta completa
+// junto con todos sus detalles
+type VentaHistorial = {
+  id: number;
+  fecha: string;
+  total: string;
+  detalles: DetalleVentaHistorial[];
+};
+
 function App() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+
   const [nombre, setNombre] = useState("");
   const [precio, setPrecio] = useState("");
   const [stock, setStock] = useState("");
   const [stockMinimo, setStockMinimo] = useState("");
+  const [categoriaId, setCategoriaId] = useState("");
+
   const [productoVentaId, setProductoVentaId] = useState("");
   const [cantidadVenta, setCantidadVenta] = useState("");
   const [mensajeVenta, setMensajeVenta] = useState("");
   const [itemsVenta, setItemsVenta] = useState<ItemVenta[]>([]);
-  const [categoriaId, setCategoriaId] = useState("");
-  const [productoEditandoId, setProductoEditandoId] = useState<number | null>(null);
+
+  const [productoEditandoId, setProductoEditandoId] =
+    useState<number | null>(null);
+
   const [nombreEdit, setNombreEdit] = useState("");
   const [precioEdit, setPrecioEdit] = useState("");
   const [stockMinimoEdit, setStockMinimoEdit] = useState("");
   const [categoriaEditId, setCategoriaEditId] = useState("");
-  const [productoReposicionId, setProductoReposicionId] = useState<number | null>(null);
+
+  const [productoReposicionId, setProductoReposicionId] =
+    useState<number | null>(null);
+
   const [cantidadReposicion, setCantidadReposicion] = useState("");
   const [mensajeReposicion, setMensajeReposicion] = useState("");
+
+  // Estado agregado para guardar el historial de ventas
+  const [ventas, setVentas] = useState<VentaHistorial[]>([]);
+  const [productosStockBajo, setProductosStockBajo] = useState<Producto[]>([]);
 
   // Traigo los productos desde el backend
   const cargarProductos = () => {
     fetch("http://localhost:3000/productos")
       .then((response) => response.json())
       .then((data) => setProductos(data))
-      .catch((error) => console.error("Error al cargar productos:", error));
+      .catch((error) =>
+        console.error("Error al cargar productos:", error)
+      );
   };
 
+  // Traigo las categorías desde el backend
+  const cargarCategorias = () => {
+    fetch("http://localhost:3000/categorias")
+      .then((response) => response.json())
+      .then((data) => setCategorias(data))
+      .catch((error) =>
+        console.error("Error al cargar categorías:", error)
+      );
+  };
+
+  // Traigo el historial de ventas desde GET /ventas
+  // El backend devuelve cada venta con sus DetalleVenta
+  // y el producto correspondiente
+  const cargarVentas = () => {
+    fetch("http://localhost:3000/ventas")
+      .then((response) => response.json())
+      .then((data) => setVentas(data))
+      .catch((error) =>
+        console.error("Error al cargar ventas:", error)
+      );
+  };
+
+  // Al cargar la aplicación consulto productos, categorías
+  // y también el historial de ventas
   useEffect(() => {
-  cargarProductos();
-  cargarCategorias();
+    cargarProductos();
+    cargarCategorias();
+    cargarVentas();
+    cargarProductosStockBajo();
   }, []);
 
   // Creo un producto nuevo desde el formulario
-  const crearProducto = async (event: SyntheticEvent<HTMLFormElement>) => {
+  const crearProducto = async (
+    event: SyntheticEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     try {
-      const response = await fetch("http://localhost:3000/productos", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nombre,
-          precio: Number(precio),
-          stock: Number(stock),
-          stockMinimo: Number(stockMinimo),
-          categoriaId: Number(categoriaId),
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:3000/productos",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre,
+            precio: Number(precio),
+            stock: Number(stock),
+            stockMinimo: Number(stockMinimo),
+            categoriaId: Number(categoriaId),
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("No se pudo crear el producto");
@@ -96,22 +164,15 @@ function App() {
     }
   };
 
-  // Traigo las categorías desde el backend
-  const cargarCategorias = () => {
-    fetch("http://localhost:3000/categorias")
-      .then((response) => response.json())
-      .then((data) => setCategorias(data))
-      .catch((error) =>
-        console.error("Error al cargar categorías:", error)
-      );
-  };
-
   // Agrego un producto al detalle de la venta
-  const agregarItemVenta = (event: SyntheticEvent<HTMLFormElement>) => {
+  const agregarItemVenta = (
+    event: SyntheticEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     const producto = productos.find(
-      (producto) => producto.id === Number(productoVentaId)
+      (producto) =>
+        producto.id === Number(productoVentaId)
     );
 
     const cantidad = Number(cantidadVenta);
@@ -122,12 +183,16 @@ function App() {
     }
 
     if (!Number.isInteger(cantidad) || cantidad <= 0) {
-      setMensajeVenta("La cantidad debe ser un número entero mayor a 0");
+      setMensajeVenta(
+        "La cantidad debe ser un número entero mayor a 0"
+      );
       return;
     }
 
     if (cantidad > producto.stock) {
-      setMensajeVenta(`Stock insuficiente para ${producto.nombre}`);
+      setMensajeVenta(
+        `Stock insuficiente para ${producto.nombre}`
+      );
       return;
     }
 
@@ -137,7 +202,9 @@ function App() {
     );
 
     if (productoYaAgregado) {
-      setMensajeVenta("Ese producto ya fue agregado a la venta");
+      setMensajeVenta(
+        "Ese producto ya fue agregado a la venta"
+      );
       return;
     }
 
@@ -159,12 +226,16 @@ function App() {
     setMensajeVenta("");
   };
 
+  // Permito modificar la cantidad de un producto
+  // antes de confirmar la venta
   const modificarCantidadItem = (
     productoId: number,
     valor: string
   ) => {
     const nuevaCantidad = Number(valor);
 
+    // Permito temporalmente dejar el input vacío
+    // para poder borrar el valor y escribir otro
     if (valor === "") {
       setItemsVenta(
         itemsVenta.map((item) =>
@@ -181,7 +252,10 @@ function App() {
       return;
     }
 
-    if (!Number.isInteger(nuevaCantidad) || nuevaCantidad <= 0) {
+    if (
+      !Number.isInteger(nuevaCantidad) ||
+      nuevaCantidad <= 0
+    ) {
       return;
     }
 
@@ -194,7 +268,9 @@ function App() {
     }
 
     if (nuevaCantidad > producto.stock) {
-      setMensajeVenta(`Stock insuficiente para ${producto.nombre}`);
+      setMensajeVenta(
+        `Stock insuficiente para ${producto.nombre}`
+      );
       return;
     }
 
@@ -204,7 +280,8 @@ function App() {
           ? {
               ...item,
               cantidad: nuevaCantidad,
-              subtotal: item.precioUnitario * nuevaCantidad,
+              subtotal:
+                item.precioUnitario * nuevaCantidad,
             }
           : item
       )
@@ -216,41 +293,52 @@ function App() {
   // Quito un producto del detalle antes de confirmar
   const quitarItemVenta = (productoId: number) => {
     setItemsVenta(
-      itemsVenta.filter((item) => item.productoId !== productoId)
+      itemsVenta.filter(
+        (item) => item.productoId !== productoId
+      )
     );
   };
-
 
   // Registro la venta completa
   const crearVenta = async () => {
     if (itemsVenta.length === 0) {
-      setMensajeVenta("La venta debe contener al menos un producto");
+      setMensajeVenta(
+        "La venta debe contener al menos un producto"
+      );
       return;
     }
 
     try {
-      const response = await fetch("http://localhost:3000/ventas", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch(
+        "http://localhost:3000/ventas",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-        body: JSON.stringify({
-          items: itemsVenta.map((item) => ({
-            productoId: item.productoId,
-            cantidad: item.cantidad,
-          })),
-        }),
-      });
+          body: JSON.stringify({
+            items: itemsVenta.map((item) => ({
+              productoId: item.productoId,
+              cantidad: item.cantidad,
+            })),
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMensajeVenta(data.message || "No se pudo registrar la venta");
+        setMensajeVenta(
+          data.message ||
+            "No se pudo registrar la venta"
+        );
         return;
       }
 
-      setMensajeVenta("Venta registrada correctamente");
+      setMensajeVenta(
+        "Venta registrada correctamente"
+      );
 
       // Limpio la venta actual
       setItemsVenta([]);
@@ -259,25 +347,46 @@ function App() {
 
       // Actualizo los stocks mostrados
       cargarProductos();
+
+      // También actualizo el historial para que
+      // la nueva venta aparezca inmediatamente
+      cargarVentas();
+
+      cargarProductosStockBajo();
     } catch (error) {
-      console.error("Error al registrar venta:", error);
-      setMensajeVenta("Error al registrar la venta");
+      console.error(
+        "Error al registrar venta:",
+        error
+      );
+
+      setMensajeVenta(
+        "Error al registrar la venta"
+      );
     }
   };
 
   // Cargo los datos del producto que quiero editar
-  const seleccionarProductoParaEditar = (producto: Producto) => {
+  const seleccionarProductoParaEditar = (
+    producto: Producto
+  ) => {
     setProductoEditandoId(producto.id);
     setNombreEdit(producto.nombre);
     setPrecioEdit(producto.precio);
-    setStockMinimoEdit(String(producto.stockMinimo));
+    setStockMinimoEdit(
+      String(producto.stockMinimo)
+    );
+
     setCategoriaEditId(
-      producto.categoriaId !== null ? String(producto.categoriaId) : ""
+      producto.categoriaId !== null
+        ? String(producto.categoriaId)
+        : ""
     );
   };
 
   // Actualizo los datos del producto seleccionado
-  const editarProducto = async (event: SyntheticEvent<HTMLFormElement>) => {
+  const editarProducto = async (
+    event: SyntheticEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     if (productoEditandoId === null) {
@@ -292,17 +401,22 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
+
           body: JSON.stringify({
             nombre: nombreEdit,
             precio: Number(precioEdit),
-            stockMinimo: Number(stockMinimoEdit),
-            categoriaId: Number(categoriaEditId),
+            stockMinimo:
+              Number(stockMinimoEdit),
+            categoriaId:
+              Number(categoriaEditId),
           }),
         }
       );
 
       if (!response.ok) {
-        throw new Error("No se pudo editar el producto");
+        throw new Error(
+          "No se pudo editar el producto"
+        );
       }
 
       setProductoEditandoId(null);
@@ -313,11 +427,17 @@ function App() {
 
       cargarProductos();
     } catch (error) {
-      console.error("Error al editar producto:", error);
+      console.error(
+        "Error al editar producto:",
+        error
+      );
     }
   };
 
-  const desactivarProducto = async (id: number) => {
+  // Realizo la baja lógica del producto
+  const desactivarProducto = async (
+    id: number
+  ) => {
     try {
       const response = await fetch(
         `http://localhost:3000/productos/${id}/desactivar`,
@@ -329,17 +449,27 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.message || "No se pudo desactivar el producto");
+        alert(
+          data.message ||
+            "No se pudo desactivar el producto"
+        );
+
         return;
       }
 
       cargarProductos();
     } catch (error) {
-      console.error("Error al desactivar producto:", error);
+      console.error(
+        "Error al desactivar producto:",
+        error
+      );
     }
   };
 
-  const reponerStock = async (event: SyntheticEvent<HTMLFormElement>) => {
+  // Repongo stock de un producto existente
+  const reponerStock = async (
+    event: SyntheticEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     if (productoReposicionId === null) {
@@ -354,8 +484,10 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
+
           body: JSON.stringify({
-            cantidad: Number(cantidadReposicion),
+            cantidad:
+              Number(cantidadReposicion),
           }),
         }
       );
@@ -364,23 +496,46 @@ function App() {
 
       if (!response.ok) {
         setMensajeReposicion(
-          data.message || "No se pudo reponer el stock"
+          data.message ||
+            "No se pudo reponer el stock"
         );
+
         return;
       }
 
-      setMensajeReposicion("Stock repuesto correctamente");
+      setMensajeReposicion(
+        "Stock repuesto correctamente"
+      );
+
       setCantidadReposicion("");
       setProductoReposicionId(null);
 
       cargarProductos();
     } catch (error) {
-      console.error("Error al reponer stock:", error);
-      setMensajeReposicion("Error al reponer el stock");
+      console.error(
+        "Error al reponer stock:",
+        error
+      );
+
+      setMensajeReposicion(
+        "Error al reponer el stock"
+      );
     }
   };
 
-  
+  // Traigo los productos activos cuyo stock
+  // está en el mínimo o por debajo
+  const cargarProductosStockBajo = () => {
+    fetch("http://localhost:3000/productos/stock-bajo")
+      .then((response) => response.json())
+      .then((data) => setProductosStockBajo(data))
+      .catch((error) =>
+        console.error(
+          "Error al cargar productos con stock bajo:",
+          error
+        )
+      );
+  };
 
   return (
     <main>
@@ -392,20 +547,26 @@ function App() {
         <form onSubmit={crearProducto}>
           <div>
             <label>Nombre</label>
+
             <input
               type="text"
               value={nombre}
-              onChange={(event) => setNombre(event.target.value)}
+              onChange={(event) =>
+                setNombre(event.target.value)
+              }
               required
             />
           </div>
 
           <div>
             <label>Precio</label>
+
             <input
               type="number"
               value={precio}
-              onChange={(event) => setPrecio(event.target.value)}
+              onChange={(event) =>
+                setPrecio(event.target.value)
+              }
               min="0"
               step="0.01"
               required
@@ -414,10 +575,13 @@ function App() {
 
           <div>
             <label>Stock</label>
+
             <input
               type="number"
               value={stock}
-              onChange={(event) => setStock(event.target.value)}
+              onChange={(event) =>
+                setStock(event.target.value)
+              }
               min="0"
               required
             />
@@ -425,10 +589,13 @@ function App() {
 
           <div>
             <label>Stock mínimo</label>
+
             <input
               type="number"
               value={stockMinimo}
-              onChange={(event) => setStockMinimo(event.target.value)}
+              onChange={(event) =>
+                setStockMinimo(event.target.value)
+              }
               min="0"
               required
             />
@@ -439,20 +606,29 @@ function App() {
 
             <select
               value={categoriaId}
-              onChange={(event) => setCategoriaId(event.target.value)}
+              onChange={(event) =>
+                setCategoriaId(event.target.value)
+              }
               required
             >
-              <option value="">Seleccionar categoría</option>
+              <option value="">
+                Seleccionar categoría
+              </option>
 
               {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
+                <option
+                  key={categoria.id}
+                  value={categoria.id}
+                >
                   {categoria.nombre}
                 </option>
               ))}
             </select>
           </div>
 
-          <button type="submit">Crear producto</button>
+          <button type="submit">
+            Crear producto
+          </button>
         </form>
       </section>
 
@@ -465,16 +641,29 @@ function App() {
 
             <select
               value={productoVentaId}
-              onChange={(event) => setProductoVentaId(event.target.value)}
+              onChange={(event) =>
+                setProductoVentaId(
+                  event.target.value
+                )
+              }
               required
             >
-              <option value="">Seleccionar producto</option>
+              <option value="">
+                Seleccionar producto
+              </option>
 
               {productos
-                .filter((producto) => producto.activo)
+                .filter(
+                  (producto) => producto.activo
+                )
                 .map((producto) => (
-                  <option key={producto.id} value={producto.id}>
-                    {producto.nombre} - ${producto.precio} - Stock: {producto.stock}
+                  <option
+                    key={producto.id}
+                    value={producto.id}
+                  >
+                    {producto.nombre} - $
+                    {producto.precio} - Stock:{" "}
+                    {producto.stock}
                   </option>
                 ))}
             </select>
@@ -486,14 +675,20 @@ function App() {
             <input
               type="number"
               value={cantidadVenta}
-              onChange={(event) => setCantidadVenta(event.target.value)}
+              onChange={(event) =>
+                setCantidadVenta(
+                  event.target.value
+                )
+              }
               min="1"
               step="1"
               required
             />
           </div>
 
-          <button type="submit">Agregar producto</button>
+          <button type="submit">
+            Agregar producto
+          </button>
         </form>
 
         {itemsVenta.length > 0 && (
@@ -521,15 +716,22 @@ function App() {
 
                   {" x $"}
 
-                  {item.precioUnitario.toFixed(2)}
+                  {item.precioUnitario.toFixed(
+                    2
+                  )}
 
                   {" - "}
 
-                  Subtotal: ${item.subtotal.toFixed(2)}
+                  Subtotal: $
+                  {item.subtotal.toFixed(2)}
 
                   <button
                     type="button"
-                    onClick={() => quitarItemVenta(item.productoId)}
+                    onClick={() =>
+                      quitarItemVenta(
+                        item.productoId
+                      )
+                    }
                   >
                     Quitar
                   </button>
@@ -541,18 +743,27 @@ function App() {
               <strong>
                 Total: $
                 {itemsVenta
-                  .reduce((total, item) => total + item.subtotal, 0)
+                  .reduce(
+                    (total, item) =>
+                      total + item.subtotal,
+                    0
+                  )
                   .toFixed(2)}
               </strong>
             </p>
 
-            <button type="button" onClick={crearVenta}>
+            <button
+              type="button"
+              onClick={crearVenta}
+            >
               Registrar venta
             </button>
           </div>
         )}
 
-        {mensajeVenta && <p>{mensajeVenta}</p>}
+        {mensajeVenta && (
+          <p>{mensajeVenta}</p>
+        )}
       </section>
 
       {productoReposicionId !== null && (
@@ -562,10 +773,15 @@ function App() {
           <form onSubmit={reponerStock}>
             <div>
               <label>Cantidad</label>
+
               <input
                 type="number"
                 value={cantidadReposicion}
-                onChange={(event) => setCantidadReposicion(event.target.value)}
+                onChange={(event) =>
+                  setCantidadReposicion(
+                    event.target.value
+                  )
+                }
                 min="1"
                 step="1"
                 required
@@ -588,7 +804,9 @@ function App() {
             </button>
           </form>
 
-          {mensajeReposicion && <p>{mensajeReposicion}</p>}
+          {mensajeReposicion && (
+            <p>{mensajeReposicion}</p>
+          )}
         </section>
       )}
 
@@ -601,15 +819,26 @@ function App() {
           <ul>
             {productos.map((producto) => (
               <li key={producto.id}>
-                {producto.nombre} - ${producto.precio} - Stock: {producto.stock}
+                {producto.nombre} - $
+                {producto.precio} - Stock:{" "}
+                {producto.stock}
                 {" - "}
-                Categoría: {producto.categoria?.nombre ?? "Sin categoría"}
+                Categoría:{" "}
+                {producto.categoria?.nombre ??
+                  "Sin categoría"}
                 {" - "}
-                Estado: {producto.activo ? "Activo" : "Inactivo"}
+                Estado:{" "}
+                {producto.activo
+                  ? "Activo"
+                  : "Inactivo"}
 
                 <button
                   type="button"
-                  onClick={() => seleccionarProductoParaEditar(producto)}
+                  onClick={() =>
+                    seleccionarProductoParaEditar(
+                      producto
+                    )
+                  }
                 >
                   Editar
                 </button>
@@ -617,24 +846,28 @@ function App() {
                 {producto.activo && (
                   <button
                     type="button"
-                    onClick={() => desactivarProducto(producto.id)}
+                    onClick={() =>
+                      desactivarProducto(
+                        producto.id
+                      )
+                    }
                   >
                     Desactivar
-                  </button> 
-
+                  </button>
                 )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductoReposicionId(producto.id);
-                      setCantidadReposicion("");
-                      setMensajeReposicion("");
-                    }}
-                  >
-                    Reponer stock
-                  </button>
-
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductoReposicionId(
+                      producto.id
+                    );
+                    setCantidadReposicion("");
+                    setMensajeReposicion("");
+                  }}
+                >
+                  Reponer stock
+                </button>
               </li>
             ))}
           </ul>
@@ -642,71 +875,185 @@ function App() {
       </section>
 
       {productoEditandoId !== null && (
-      <section>
-        <h2>Editar producto</h2>
+        <section>
+          <h2>Editar producto</h2>
 
-        <form onSubmit={editarProducto}>
-          <div>
-            <label>Nombre</label>
-            <input
-              type="text"
-              value={nombreEdit}
-              onChange={(event) => setNombreEdit(event.target.value)}
-              required
-            />
-          </div>
+          <form onSubmit={editarProducto}>
+            <div>
+              <label>Nombre</label>
 
-          <div>
-            <label>Precio</label>
-            <input
-              type="number"
-              value={precioEdit}
-              onChange={(event) => setPrecioEdit(event.target.value)}
-              min="0"
-              step="0.01"
-              required
-            />
-          </div>
+              <input
+                type="text"
+                value={nombreEdit}
+                onChange={(event) =>
+                  setNombreEdit(
+                    event.target.value
+                  )
+                }
+                required
+              />
+            </div>
 
-          <div>
-            <label>Stock mínimo</label>
-            <input
-              type="number"
-              value={stockMinimoEdit}
-              onChange={(event) => setStockMinimoEdit(event.target.value)}
-              min="0"
-              required
-            />
-          </div>
+            <div>
+              <label>Precio</label>
 
-          <div>
-            <label>Categoría</label>
-            <select
-              value={categoriaEditId}
-              onChange={(event) => setCategoriaEditId(event.target.value)}
-              required
-            >
-              <option value="">Seleccionar categoría</option>
+              <input
+                type="number"
+                value={precioEdit}
+                onChange={(event) =>
+                  setPrecioEdit(
+                    event.target.value
+                  )
+                }
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
 
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nombre}
+            <div>
+              <label>Stock mínimo</label>
+
+              <input
+                type="number"
+                value={stockMinimoEdit}
+                onChange={(event) =>
+                  setStockMinimoEdit(
+                    event.target.value
+                  )
+                }
+                min="0"
+                required
+              />
+            </div>
+
+            <div>
+              <label>Categoría</label>
+
+              <select
+                value={categoriaEditId}
+                onChange={(event) =>
+                  setCategoriaEditId(
+                    event.target.value
+                  )
+                }
+                required
+              >
+                <option value="">
+                  Seleccionar categoría
                 </option>
-              ))}
-            </select>
+
+                {categorias.map(
+                  (categoria) => (
+                    <option
+                      key={categoria.id}
+                      value={categoria.id}
+                    >
+                      {categoria.nombre}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+
+            <button type="submit">
+              Guardar cambios
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setProductoEditandoId(null)
+              }
+            >
+              Cancelar
+            </button>
+          </form>
+        </section>
+      )}
+
+      {/* HU-08 - Historial de ventas */}
+      {/* Se muestran las ventas registradas desde la más reciente */}
+      {/* Cada venta incluye fecha, total y el detalle de sus productos */}
+      <section>
+        <h2>Historial de ventas</h2>
+
+        {ventas.length === 0 ? (
+          <p>No hay ventas registradas.</p>
+        ) : (
+          <div>
+            {ventas.map((venta) => (
+              <div key={venta.id}>
+                <h3>Venta #{venta.id}</h3>
+
+                <p>
+                  Fecha:{" "}
+                  {new Date(
+                    venta.fecha
+                  ).toLocaleString()}
+                </p>
+
+                <p>
+                  Total: $
+                  {Number(
+                    venta.total
+                  ).toFixed(2)}
+                </p>
+
+                <ul>
+                  {venta.detalles.map(
+                    (detalle) => (
+                      <li key={detalle.id}>
+                        {
+                          detalle.producto
+                            .nombre
+                        }
+                        {" - "}
+                        Cantidad:{" "}
+                        {detalle.cantidad}
+                        {" - "}
+                        Precio unitario: $
+                        {Number(
+                          detalle.precioUnitario
+                        ).toFixed(2)}
+                        {" - "}
+                        Subtotal: $
+                        {Number(
+                          detalle.subtotal
+                        ).toFixed(2)}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            ))}
           </div>
-
-          <button type="submit">Guardar cambios</button>
-
-          <button
-            type="button"
-            onClick={() => setProductoEditandoId(null)}
-          >
-            Cancelar
-          </button>
-        </form>
+        )}
       </section>
-    )}
+
+        {/* HU-09 - Productos con stock bajo */}
+      <section>
+        <h2>Productos con stock bajo</h2>
+
+        {productosStockBajo.length === 0 ? (
+          <p>No hay productos con stock bajo.</p>
+        ) : (
+          <ul>
+            {productosStockBajo.map((producto) => (
+              <li key={producto.id}>
+                {producto.nombre}
+                {" - "}
+                Stock actual: {producto.stock}
+                {" - "}
+                Stock mínimo: {producto.stockMinimo}
+                {" - "}
+                Categoría: {producto.categoria?.nombre ?? "Sin categoría"}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
     </main>
   );
 }
