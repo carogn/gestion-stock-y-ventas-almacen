@@ -122,3 +122,32 @@ export const crearVenta = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const listarVentas = async (_req: Request, res: Response) => {
+  try {
+    const ventas = await Venta.findAll({
+      include: [
+        {
+          model: DetalleVenta,
+          as: "detalles",
+          include: [
+            {
+              model: Producto,
+              as: "producto",
+              attributes: ["id", "nombre"],
+            },
+          ],
+        },
+      ],
+      order: [["fecha", "DESC"]],
+    });
+
+    return res.status(200).json(ventas);
+  } catch (error) {
+    console.error("Error al listar las ventas:", error);
+
+    return res.status(500).json({
+      message: "Error al listar las ventas",
+    });
+  }
+};

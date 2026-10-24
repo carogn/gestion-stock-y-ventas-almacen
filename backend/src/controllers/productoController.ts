@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { Op, col } from "sequelize";
 import Producto from "../models/Producto";
 import Categoria from "../models/Categoria";
 
@@ -246,6 +247,46 @@ export const reponerStock = async (req: Request, res: Response) => {
 
     res.status(500).json({
       message: "Error al reponer el stock",
+    });
+  }
+};
+
+// Trae los productos activos cuyo stock actual
+// es menor o igual al stock mínimo configurado
+export const listarProductosStockBajo = async (
+  _req: Request,
+  res: Response
+) => {
+  try {
+    const productos = await Producto.findAll({
+      where: {
+        activo: true,
+        stock: {
+          [Op.lte]: col("stock_minimo"),
+        },
+      },
+
+      include: [
+        {
+          model: Categoria,
+          as: "categoria",
+          attributes: ["id", "nombre"],
+        },
+      ],
+
+      order: [["stock", "ASC"]],
+    });
+
+    return res.status(200).json(productos);
+  } catch (error) {
+    console.error(
+      "Error al listar productos con stock bajo:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Error al obtener los productos con stock bajo",
     });
   }
 };
