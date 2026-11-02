@@ -1,6 +1,28 @@
 import { useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
+import {
+  Accordion,
+  AppShell,
+  Badge,
+  Button,
+  Container,
+  Divider,
+  Group,
+  NumberInput,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
+
+import Dashboard from "./components/Dashboard";
+import Sidebar from "./components/Sidebar";
+import type { Seccion } from "./components/Sidebar";
+
 type Categoria = {
   id: number;
   nombre: string;
@@ -26,8 +48,6 @@ type ItemVenta = {
   subtotal: number;
 };
 
-// Tipo utilizado para representar cada detalle de una venta
-// dentro del historial
 type DetalleVentaHistorial = {
   id: number;
   productoId: number;
@@ -40,8 +60,6 @@ type DetalleVentaHistorial = {
   };
 };
 
-// Tipo utilizado para representar una venta completa
-// junto con todos sus detalles
 type VentaHistorial = {
   id: number;
   fecha: string;
@@ -50,6 +68,9 @@ type VentaHistorial = {
 };
 
 function App() {
+  const [seccionActiva, setSeccionActiva] =
+    useState<Seccion>("inicio");
+
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
 
@@ -78,11 +99,18 @@ function App() {
   const [cantidadReposicion, setCantidadReposicion] = useState("");
   const [mensajeReposicion, setMensajeReposicion] = useState("");
 
-  // Estado agregado para guardar el historial de ventas
   const [ventas, setVentas] = useState<VentaHistorial[]>([]);
-  const [productosStockBajo, setProductosStockBajo] = useState<Producto[]>([]);
 
-  // Traigo los productos desde el backend
+  const [productosStockBajo, setProductosStockBajo] =
+    useState<Producto[]>([]);
+
+  const [mostrarNuevoProducto, setMostrarNuevoProducto] =
+    useState(false);
+
+  // =========================
+  // CARGAS DESDE EL BACKEND
+  // =========================
+
   const cargarProductos = () => {
     fetch("http://localhost:3000/productos")
       .then((response) => response.json())
@@ -92,7 +120,6 @@ function App() {
       );
   };
 
-  // Traigo las categorías desde el backend
   const cargarCategorias = () => {
     fetch("http://localhost:3000/categorias")
       .then((response) => response.json())
@@ -102,9 +129,6 @@ function App() {
       );
   };
 
-  // Traigo el historial de ventas desde GET /ventas
-  // El backend devuelve cada venta con sus DetalleVenta
-  // y el producto correspondiente
   const cargarVentas = () => {
     fetch("http://localhost:3000/ventas")
       .then((response) => response.json())
@@ -114,8 +138,18 @@ function App() {
       );
   };
 
-  // Al cargar la aplicación consulto productos, categorías
-  // y también el historial de ventas
+  const cargarProductosStockBajo = () => {
+    fetch("http://localhost:3000/productos/stock-bajo")
+      .then((response) => response.json())
+      .then((data) => setProductosStockBajo(data))
+      .catch((error) =>
+        console.error(
+          "Error al cargar productos con stock bajo:",
+          error
+        )
+      );
+  };
+
   useEffect(() => {
     cargarProductos();
     cargarCategorias();
@@ -123,7 +157,10 @@ function App() {
     cargarProductosStockBajo();
   }, []);
 
-  // Creo un producto nuevo desde el formulario
+  // =========================
+  // PRODUCTOS
+  // =========================
+
   const crearProducto = async (
     event: SyntheticEvent<HTMLFormElement>
   ) => {
@@ -151,20 +188,111 @@ function App() {
         throw new Error("No se pudo crear el producto");
       }
 
-      // Limpio el formulario y vuelvo a consultar la lista
       setNombre("");
       setPrecio("");
       setStock("");
       setStockMinimo("");
       setCategoriaId("");
+      setMostrarNuevoProducto(false);
 
       cargarProductos();
+      cargarProductosStockBajo();
     } catch (error) {
       console.error("Error al crear producto:", error);
     }
   };
 
-  // Agrego un producto al detalle de la venta
+  const seleccionarProductoParaEditar = (
+    producto: Producto
+  ) => {
+    setProductoEditandoId(producto.id);
+    setNombreEdit(producto.nombre);
+    setPrecioEdit(producto.precio);
+    setStockMinimoEdit(String(producto.stockMinimo));
+
+    setCategoriaEditId(
+      producto.categoriaId !== null
+        ? String(producto.categoriaId)
+        : ""
+    );
+  };
+
+  const editarProducto = async (
+    event: SyntheticEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    if (productoEditandoId === null) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:3000/productos/${productoEditandoId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nombre: nombreEdit,
+            precio: Number(precioEdit),
+            stockMinimo: Number(stockMinimoEdit),
+            categoriaId: Number(categoriaEditId),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("No se pudo editar el producto");
+      }
+
+      setProductoEditandoId(null);
+      setNombreEdit("");
+      setPrecioEdit("");
+      setStockMinimoEdit("");
+      setCategoriaEditId("");
+
+      cargarProductos();
+      cargarProductosStockBajo();
+    } catch (error) {
+      console.error("Error al editar producto:", error);
+    }
+  };
+
+  const desactivarProducto = async (id: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3000/productos/${id}/desactivar`,
+        {
+          method: "PATCH",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(
+          data.message ||
+            "No se pudo desactivar el producto"
+        );
+        return;
+      }
+
+      cargarProductos();
+      cargarProductosStockBajo();
+    } catch (error) {
+      console.error(
+        "Error al desactivar producto:",
+        error
+      );
+    }
+  };
+
+  // =========================
+  // VENTA
+  // =========================
+
   const agregarItemVenta = (
     event: SyntheticEvent<HTMLFormElement>
   ) => {
@@ -196,7 +324,6 @@ function App() {
       return;
     }
 
-    // Por ahora no permito repetir el mismo producto
     const productoYaAgregado = itemsVenta.some(
       (item) => item.productoId === producto.id
     );
@@ -226,16 +353,12 @@ function App() {
     setMensajeVenta("");
   };
 
-  // Permito modificar la cantidad de un producto
-  // antes de confirmar la venta
   const modificarCantidadItem = (
     productoId: number,
     valor: string
   ) => {
     const nuevaCantidad = Number(valor);
 
-    // Permito temporalmente dejar el input vacío
-    // para poder borrar el valor y escribir otro
     if (valor === "") {
       setItemsVenta(
         itemsVenta.map((item) =>
@@ -290,7 +413,6 @@ function App() {
     setMensajeVenta("");
   };
 
-  // Quito un producto del detalle antes de confirmar
   const quitarItemVenta = (productoId: number) => {
     setItemsVenta(
       itemsVenta.filter(
@@ -299,7 +421,6 @@ function App() {
     );
   };
 
-  // Registro la venta completa
   const crearVenta = async () => {
     if (itemsVenta.length === 0) {
       setMensajeVenta(
@@ -316,7 +437,6 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             items: itemsVenta.map((item) => ({
               productoId: item.productoId,
@@ -340,18 +460,12 @@ function App() {
         "Venta registrada correctamente"
       );
 
-      // Limpio la venta actual
       setItemsVenta([]);
       setProductoVentaId("");
       setCantidadVenta("");
 
-      // Actualizo los stocks mostrados
       cargarProductos();
-
-      // También actualizo el historial para que
-      // la nueva venta aparezca inmediatamente
       cargarVentas();
-
       cargarProductosStockBajo();
     } catch (error) {
       console.error(
@@ -365,108 +479,17 @@ function App() {
     }
   };
 
-  // Cargo los datos del producto que quiero editar
-  const seleccionarProductoParaEditar = (
-    producto: Producto
-  ) => {
-    setProductoEditandoId(producto.id);
-    setNombreEdit(producto.nombre);
-    setPrecioEdit(producto.precio);
-    setStockMinimoEdit(
-      String(producto.stockMinimo)
-    );
+  // =========================
+  // STOCK
+  // =========================
 
-    setCategoriaEditId(
-      producto.categoriaId !== null
-        ? String(producto.categoriaId)
-        : ""
-    );
+  const abrirReposicion = (productoId: number) => {
+    setProductoReposicionId(productoId);
+    setCantidadReposicion("");
+    setMensajeReposicion("");
+    setSeccionActiva("stock");
   };
 
-  // Actualizo los datos del producto seleccionado
-  const editarProducto = async (
-    event: SyntheticEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-
-    if (productoEditandoId === null) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:3000/productos/${productoEditandoId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            nombre: nombreEdit,
-            precio: Number(precioEdit),
-            stockMinimo:
-              Number(stockMinimoEdit),
-            categoriaId:
-              Number(categoriaEditId),
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          "No se pudo editar el producto"
-        );
-      }
-
-      setProductoEditandoId(null);
-      setNombreEdit("");
-      setPrecioEdit("");
-      setStockMinimoEdit("");
-      setCategoriaEditId("");
-
-      cargarProductos();
-    } catch (error) {
-      console.error(
-        "Error al editar producto:",
-        error
-      );
-    }
-  };
-
-  // Realizo la baja lógica del producto
-  const desactivarProducto = async (
-    id: number
-  ) => {
-    try {
-      const response = await fetch(
-        `http://localhost:3000/productos/${id}/desactivar`,
-        {
-          method: "PATCH",
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(
-          data.message ||
-            "No se pudo desactivar el producto"
-        );
-
-        return;
-      }
-
-      cargarProductos();
-    } catch (error) {
-      console.error(
-        "Error al desactivar producto:",
-        error
-      );
-    }
-  };
-
-  // Repongo stock de un producto existente
   const reponerStock = async (
     event: SyntheticEvent<HTMLFormElement>
   ) => {
@@ -484,10 +507,8 @@ function App() {
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
-            cantidad:
-              Number(cantidadReposicion),
+            cantidad: Number(cantidadReposicion),
           }),
         }
       );
@@ -499,7 +520,6 @@ function App() {
           data.message ||
             "No se pudo reponer el stock"
         );
-
         return;
       }
 
@@ -511,6 +531,7 @@ function App() {
       setProductoReposicionId(null);
 
       cargarProductos();
+      cargarProductosStockBajo();
     } catch (error) {
       console.error(
         "Error al reponer stock:",
@@ -523,538 +544,1010 @@ function App() {
     }
   };
 
-  // Traigo los productos activos cuyo stock
-  // está en el mínimo o por debajo
-  const cargarProductosStockBajo = () => {
-    fetch("http://localhost:3000/productos/stock-bajo")
-      .then((response) => response.json())
-      .then((data) => setProductosStockBajo(data))
-      .catch((error) =>
-        console.error(
-          "Error al cargar productos con stock bajo:",
-          error
-        )
-      );
-  };
+  // =========================
+  // INTERFAZ
+  // =========================
 
   return (
-    <main>
-      <h1>Gestión de stock y ventas</h1>
+    <AppShell
+      navbar={{
+        width: 250,
+        breakpoint: "sm",
+      }}
+      padding="xl"
+    >
+      <Sidebar
+        seccionActiva={seccionActiva}
+        cambiarSeccion={setSeccionActiva}
+      />
 
-      <section>
-        <h2>Nuevo producto</h2>
+      <AppShell.Main bg="#f8f9fa">
+        <Container size="xl">
+          <Text
+            size="xs"
+            c="dimmed"
+            fw={600}
+            mb={4}
+          >
+            Gestión comercial
+          </Text>
 
-        <form onSubmit={crearProducto}>
-          <div>
-            <label>Nombre</label>
+          <Title order={1} mb="xl">
+            {seccionActiva === "inicio" && "Inicio"}
+            {seccionActiva === "productos" &&
+              "Productos"}
+            {seccionActiva === "venta" &&
+              "Nueva venta"}
+            {seccionActiva === "historial" &&
+              "Historial"}
+            {seccionActiva === "stock" && "Stock"}
+          </Title>
 
-            <input
-              type="text"
-              value={nombre}
-              onChange={(event) =>
-                setNombre(event.target.value)
-              }
-              required
-            />
-          </div>
+          {/* ========================= */}
+          {/* INICIO */}
+          {/* ========================= */}
 
-          <div>
-            <label>Precio</label>
-
-            <input
-              type="number"
-              value={precio}
-              onChange={(event) =>
-                setPrecio(event.target.value)
-              }
-              min="0"
-              step="0.01"
-              required
-            />
-          </div>
-
-          <div>
-            <label>Stock</label>
-
-            <input
-              type="number"
-              value={stock}
-              onChange={(event) =>
-                setStock(event.target.value)
-              }
-              min="0"
-              required
-            />
-          </div>
-
-          <div>
-            <label>Stock mínimo</label>
-
-            <input
-              type="number"
-              value={stockMinimo}
-              onChange={(event) =>
-                setStockMinimo(event.target.value)
-              }
-              min="0"
-              required
-            />
-          </div>
-
-          <div>
-            <label>Categoría</label>
-
-            <select
-              value={categoriaId}
-              onChange={(event) =>
-                setCategoriaId(event.target.value)
-              }
-              required
-            >
-              <option value="">
-                Seleccionar categoría
-              </option>
-
-              {categorias.map((categoria) => (
-                <option
-                  key={categoria.id}
-                  value={categoria.id}
-                >
-                  {categoria.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button type="submit">
-            Crear producto
-          </button>
-        </form>
-      </section>
-
-      <section>
-        <h2>Nueva venta</h2>
-
-        <form onSubmit={agregarItemVenta}>
-          <div>
-            <label>Producto</label>
-
-            <select
-              value={productoVentaId}
-              onChange={(event) =>
-                setProductoVentaId(
-                  event.target.value
-                )
-              }
-              required
-            >
-              <option value="">
-                Seleccionar producto
-              </option>
-
-              {productos
-                .filter(
-                  (producto) => producto.activo
-                )
-                .map((producto) => (
-                  <option
-                    key={producto.id}
-                    value={producto.id}
-                  >
-                    {producto.nombre} - $
-                    {producto.precio} - Stock:{" "}
-                    {producto.stock}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div>
-            <label>Cantidad</label>
-
-            <input
-              type="number"
-              value={cantidadVenta}
-              onChange={(event) =>
-                setCantidadVenta(
-                  event.target.value
-                )
-              }
-              min="1"
-              step="1"
-              required
-            />
-          </div>
-
-          <button type="submit">
-            Agregar producto
-          </button>
-        </form>
-
-        {itemsVenta.length > 0 && (
-          <div>
-            <h3>Detalle de venta</h3>
-
-            <ul>
-              {itemsVenta.map((item) => (
-                <li key={item.productoId}>
-                  {item.nombre}
-                  {" - "}
-                  Cantidad:
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={item.cantidad}
-                    onChange={(event) =>
-                      modificarCantidadItem(
-                        item.productoId,
-                        event.target.value
-                      )
-                    }
-                  />
-
-                  {" x $"}
-
-                  {item.precioUnitario.toFixed(
-                    2
-                  )}
-
-                  {" - "}
-
-                  Subtotal: $
-                  {item.subtotal.toFixed(2)}
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      quitarItemVenta(
-                        item.productoId
-                      )
-                    }
-                  >
-                    Quitar
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            <p>
-              <strong>
-                Total: $
-                {itemsVenta
-                  .reduce(
-                    (total, item) =>
-                      total + item.subtotal,
-                    0
-                  )
-                  .toFixed(2)}
-              </strong>
-            </p>
-
-            <button
-              type="button"
-              onClick={crearVenta}
-            >
-              Registrar venta
-            </button>
-          </div>
-        )}
-
-        {mensajeVenta && (
-          <p>{mensajeVenta}</p>
-        )}
-      </section>
-
-      {productoReposicionId !== null && (
-        <section>
-          <h2>Reponer stock</h2>
-
-          <form onSubmit={reponerStock}>
-            <div>
-              <label>Cantidad</label>
-
-              <input
-                type="number"
-                value={cantidadReposicion}
-                onChange={(event) =>
-                  setCantidadReposicion(
-                    event.target.value
-                  )
-                }
-                min="1"
-                step="1"
-                required
-              />
-            </div>
-
-            <button type="submit">
-              Confirmar reposición
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setProductoReposicionId(null);
-                setCantidadReposicion("");
-                setMensajeReposicion("");
-              }}
-            >
-              Cancelar
-            </button>
-          </form>
-
-          {mensajeReposicion && (
-            <p>{mensajeReposicion}</p>
+          {seccionActiva === "inicio" && (
+            <Dashboard />
           )}
-        </section>
-      )}
 
-      <section>
-        <h2>Productos</h2>
+          {/* ========================= */}
+          {/* PRODUCTOS */}
+          {/* ========================= */}
 
-        {productos.length === 0 ? (
-          <p>No hay productos cargados.</p>
-        ) : (
-          <ul>
-            {productos.map((producto) => (
-              <li key={producto.id}>
-                {producto.nombre} - $
-                {producto.precio} - Stock:{" "}
-                {producto.stock}
-                {" - "}
-                Categoría:{" "}
-                {producto.categoria?.nombre ??
-                  "Sin categoría"}
-                {" - "}
-                Estado:{" "}
-                {producto.activo
-                  ? "Activo"
-                  : "Inactivo"}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    seleccionarProductoParaEditar(
-                      producto
-                    )
-                  }
+          {seccionActiva === "productos" && (
+            <Stack gap="lg">
+              <Paper
+                withBorder
+                radius="lg"
+                p="xl"
+                shadow="xs"
+              >
+                <Group
+                  justify="space-between"
+                  mb="lg"
                 >
-                  Editar
-                </button>
+                  <div>
+                    <Title order={2} size="h3">
+                      Productos
+                    </Title>
 
-                {producto.activo && (
-                  <button
-                    type="button"
+                    <Text
+                      size="sm"
+                      c="dimmed"
+                      mt={4}
+                    >
+                      Administrá los productos
+                      disponibles en el inventario.
+                    </Text>
+                  </div>
+
+                  <Button
+                    color="violet"
                     onClick={() =>
-                      desactivarProducto(
-                        producto.id
+                      setMostrarNuevoProducto(
+                        !mostrarNuevoProducto
                       )
                     }
                   >
-                    Desactivar
-                  </button>
-                )}
+                    {mostrarNuevoProducto
+                      ? "Cancelar"
+                      : "Nuevo producto"}
+                  </Button>
+                </Group>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductoReposicionId(
-                      producto.id
-                    );
-                    setCantidadReposicion("");
-                    setMensajeReposicion("");
-                  }}
-                >
-                  Reponer stock
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {productoEditandoId !== null && (
-        <section>
-          <h2>Editar producto</h2>
-
-          <form onSubmit={editarProducto}>
-            <div>
-              <label>Nombre</label>
-
-              <input
-                type="text"
-                value={nombreEdit}
-                onChange={(event) =>
-                  setNombreEdit(
-                    event.target.value
-                  )
-                }
-                required
-              />
-            </div>
-
-            <div>
-              <label>Precio</label>
-
-              <input
-                type="number"
-                value={precioEdit}
-                onChange={(event) =>
-                  setPrecioEdit(
-                    event.target.value
-                  )
-                }
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            <div>
-              <label>Stock mínimo</label>
-
-              <input
-                type="number"
-                value={stockMinimoEdit}
-                onChange={(event) =>
-                  setStockMinimoEdit(
-                    event.target.value
-                  )
-                }
-                min="0"
-                required
-              />
-            </div>
-
-            <div>
-              <label>Categoría</label>
-
-              <select
-                value={categoriaEditId}
-                onChange={(event) =>
-                  setCategoriaEditId(
-                    event.target.value
-                  )
-                }
-                required
-              >
-                <option value="">
-                  Seleccionar categoría
-                </option>
-
-                {categorias.map(
-                  (categoria) => (
-                    <option
-                      key={categoria.id}
-                      value={categoria.id}
+                {mostrarNuevoProducto && (
+                  <Paper
+                    withBorder
+                    radius="md"
+                    p="lg"
+                    mb="xl"
+                    bg="gray.0"
+                  >
+                    <Title
+                      order={3}
+                      size="h4"
+                      mb="md"
                     >
-                      {categoria.nombre}
-                    </option>
-                  )
+                      Agregar producto
+                    </Title>
+
+                    <form
+                      onSubmit={crearProducto}
+                    >
+                      <Group
+                        align="flex-end"
+                        grow
+                      >
+                        <TextInput
+                          label="Nombre"
+                          placeholder="Ej. Coca Cola 2.25L"
+                          value={nombre}
+                          onChange={(event) =>
+                            setNombre(
+                              event.target.value
+                            )
+                          }
+                          required
+                        />
+
+                        <NumberInput
+                          label="Precio"
+                          placeholder="0"
+                          value={precio}
+                          onChange={(value) =>
+                            setPrecio(
+                              String(value)
+                            )
+                          }
+                          min={0}
+                          decimalScale={2}
+                          required
+                        />
+
+                        <NumberInput
+                          label="Stock inicial"
+                          placeholder="0"
+                          value={stock}
+                          onChange={(value) =>
+                            setStock(String(value))
+                          }
+                          min={0}
+                          required
+                        />
+
+                        <NumberInput
+                          label="Stock mínimo"
+                          placeholder="0"
+                          value={stockMinimo}
+                          onChange={(value) =>
+                            setStockMinimo(
+                              String(value)
+                            )
+                          }
+                          min={0}
+                          required
+                        />
+
+                        <Select
+                          label="Categoría"
+                          placeholder="Seleccionar"
+                          data={categorias.map(
+                            (categoria) => ({
+                              value: String(
+                                categoria.id
+                              ),
+                              label:
+                                categoria.nombre,
+                            })
+                          )}
+                          value={categoriaId}
+                          onChange={(value) =>
+                            setCategoriaId(
+                              value ?? ""
+                            )
+                          }
+                          required
+                        />
+
+                        <Button
+                          type="submit"
+                          color="violet"
+                        >
+                          Guardar
+                        </Button>
+                      </Group>
+                    </form>
+                  </Paper>
                 )}
-              </select>
-            </div>
 
-            <button type="submit">
-              Guardar cambios
-            </button>
+                {productos.length === 0 ? (
+                  <Text c="dimmed">
+                    No hay productos cargados.
+                  </Text>
+                ) : (
+                  <Table
+                    striped
+                    highlightOnHover
+                    withTableBorder
+                  >
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>
+                          Producto
+                        </Table.Th>
 
-            <button
-              type="button"
-              onClick={() =>
-                setProductoEditandoId(null)
-              }
-            >
-              Cancelar
-            </button>
-          </form>
-        </section>
-      )}
+                        <Table.Th>
+                          Categoría
+                        </Table.Th>
 
-      {/* HU-08 - Historial de ventas */}
-      {/* Se muestran las ventas registradas desde la más reciente */}
-      {/* Cada venta incluye fecha, total y el detalle de sus productos */}
-      <section>
-        <h2>Historial de ventas</h2>
+                        <Table.Th>
+                          Precio
+                        </Table.Th>
 
-        {ventas.length === 0 ? (
-          <p>No hay ventas registradas.</p>
-        ) : (
-          <div>
-            {ventas.map((venta) => (
-              <div key={venta.id}>
-                <h3>Venta #{venta.id}</h3>
+                        <Table.Th>
+                          Stock
+                        </Table.Th>
 
-                <p>
-                  Fecha:{" "}
-                  {new Date(
-                    venta.fecha
-                  ).toLocaleString()}
-                </p>
+                        <Table.Th>
+                          Estado
+                        </Table.Th>
 
-                <p>
-                  Total: $
-                  {Number(
-                    venta.total
-                  ).toFixed(2)}
-                </p>
+                        <Table.Th>
+                          Acciones
+                        </Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
 
-                <ul>
-                  {venta.detalles.map(
-                    (detalle) => (
-                      <li key={detalle.id}>
-                        {
-                          detalle.producto
-                            .nombre
+                    <Table.Tbody>
+                      {productos.map(
+                        (producto) => (
+                          <Table.Tr
+                            key={producto.id}
+                          >
+                            <Table.Td>
+                              <Text fw={600}>
+                                {
+                                  producto.nombre
+                                }
+                              </Text>
+                            </Table.Td>
+
+                            <Table.Td>
+                              {producto
+                                .categoria
+                                ?.nombre ??
+                                "Sin categoría"}
+                            </Table.Td>
+
+                            <Table.Td>
+                              $
+                              {Number(
+                                producto.precio
+                              ).toLocaleString(
+                                "es-AR"
+                              )}
+                            </Table.Td>
+
+                            <Table.Td>
+                              <Badge
+                                color={
+                                  producto.stock <=
+                                  producto.stockMinimo
+                                    ? "red"
+                                    : "violet"
+                                }
+                                variant="light"
+                              >
+                                {
+                                  producto.stock
+                                }
+                              </Badge>
+                            </Table.Td>
+
+                            <Table.Td>
+                              <Badge
+                                color={
+                                  producto.activo
+                                    ? "green"
+                                    : "gray"
+                                }
+                                variant="light"
+                              >
+                                {producto.activo
+                                  ? "Activo"
+                                  : "Inactivo"}
+                              </Badge>
+                            </Table.Td>
+
+                            <Table.Td>
+                              <Group gap="xs">
+                                <Button
+                                  size="xs"
+                                  variant="light"
+                                  color="violet"
+                                  onClick={() =>
+                                    seleccionarProductoParaEditar(
+                                      producto
+                                    )
+                                  }
+                                >
+                                  Editar
+                                </Button>
+
+                                <Button
+                                  size="xs"
+                                  variant="light"
+                                  color="blue"
+                                  onClick={() =>
+                                    abrirReposicion(
+                                      producto.id
+                                    )
+                                  }
+                                >
+                                  Stock
+                                </Button>
+
+                                {producto.activo && (
+                                  <Button
+                                    size="xs"
+                                    variant="light"
+                                    color="red"
+                                    onClick={() =>
+                                      desactivarProducto(
+                                        producto.id
+                                      )
+                                    }
+                                  >
+                                    Desactivar
+                                  </Button>
+                                )}
+                              </Group>
+                            </Table.Td>
+                          </Table.Tr>
+                        )
+                      )}
+                    </Table.Tbody>
+                  </Table>
+                )}
+              </Paper>
+
+              {productoEditandoId !== null && (
+                <Paper
+                  withBorder
+                  radius="lg"
+                  p="xl"
+                  shadow="xs"
+                >
+                  <Title
+                    order={2}
+                    size="h3"
+                  >
+                    Editar producto
+                  </Title>
+
+                  <Text
+                    size="sm"
+                    c="dimmed"
+                    mt={4}
+                    mb="lg"
+                  >
+                    Modificá los datos
+                    principales del producto.
+                  </Text>
+
+                  <form
+                    onSubmit={editarProducto}
+                  >
+                    <Group
+                      align="flex-end"
+                      grow
+                    >
+                      <TextInput
+                        label="Nombre"
+                        value={nombreEdit}
+                        onChange={(event) =>
+                          setNombreEdit(
+                            event.target.value
+                          )
                         }
-                        {" - "}
-                        Cantidad:{" "}
-                        {detalle.cantidad}
-                        {" - "}
-                        Precio unitario: $
-                        {Number(
-                          detalle.precioUnitario
-                        ).toFixed(2)}
-                        {" - "}
-                        Subtotal: $
-                        {Number(
-                          detalle.subtotal
-                        ).toFixed(2)}
-                      </li>
-                    )
+                        required
+                      />
+
+                      <NumberInput
+                        label="Precio"
+                        value={precioEdit}
+                        onChange={(value) =>
+                          setPrecioEdit(
+                            String(value)
+                          )
+                        }
+                        min={0}
+                        decimalScale={2}
+                        required
+                      />
+
+                      <NumberInput
+                        label="Stock mínimo"
+                        value={stockMinimoEdit}
+                        onChange={(value) =>
+                          setStockMinimoEdit(
+                            String(value)
+                          )
+                        }
+                        min={0}
+                        required
+                      />
+
+                      <Select
+                        label="Categoría"
+                        data={categorias.map(
+                          (categoria) => ({
+                            value: String(
+                              categoria.id
+                            ),
+                            label:
+                              categoria.nombre,
+                          })
+                        )}
+                        value={categoriaEditId}
+                        onChange={(value) =>
+                          setCategoriaEditId(
+                            value ?? ""
+                          )
+                        }
+                        required
+                      />
+
+                      <Button
+                        type="submit"
+                        color="violet"
+                      >
+                        Guardar cambios
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="light"
+                        color="gray"
+                        onClick={() =>
+                          setProductoEditandoId(
+                            null
+                          )
+                        }
+                      >
+                        Cancelar
+                      </Button>
+                    </Group>
+                  </form>
+                </Paper>
+              )}
+            </Stack>
+          )}
+
+          {/* ========================= */}
+          {/* NUEVA VENTA */}
+          {/* ========================= */}
+
+          {seccionActiva === "venta" && (
+            <Paper
+              withBorder
+              radius="lg"
+              p="xl"
+              shadow="xs"
+            >
+              <Stack gap="lg">
+                <div>
+                  <Title order={2} size="h3">
+                    Nueva venta
+                  </Title>
+
+                  <Text size="sm" c="dimmed" mt={4}>
+                    Seleccioná los productos y confirmá la venta.
+                  </Text>
+                </div>
+
+                <form onSubmit={agregarItemVenta}>
+                  <Group align="flex-end">
+                    <Select
+                      label="Producto"
+                      placeholder="Seleccionar producto"
+                      data={productos
+                        .filter((producto) => producto.activo)
+                        .map((producto) => ({
+                          value: String(producto.id),
+                          label: `${producto.nombre} - $${producto.precio} - Stock: ${producto.stock}`,
+                        }))}
+                      value={productoVentaId}
+                      onChange={(value) =>
+                        setProductoVentaId(value ?? "")
+                      }
+                      searchable
+                      style={{ flex: 1 }}
+                      required
+                    />
+
+                    <NumberInput
+                      label="Cantidad"
+                      value={cantidadVenta}
+                      onChange={(value) =>
+                        setCantidadVenta(String(value))
+                      }
+                      min={1}
+                      step={1}
+                      w={140}
+                      required
+                    />
+
+                    <Button
+                      type="submit"
+                      color="violet"
+                    >
+                      Agregar
+                    </Button>
+                  </Group>
+                </form>
+
+                <Divider />
+
+                <div>
+                  <Group
+                    justify="space-between"
+                    mb="md"
+                  >
+                    <Title order={3} size="h4">
+                      Detalle de venta
+                    </Title>
+
+                    <Badge
+                      color="violet"
+                      variant="light"
+                    >
+                      {itemsVenta.length} productos
+                    </Badge>
+                  </Group>
+
+                  {itemsVenta.length === 0 ? (
+                    <Text c="dimmed" size="sm">
+                      Todavía no agregaste productos a la venta.
+                    </Text>
+                  ) : (
+                    <Table
+                      withTableBorder
+                      highlightOnHover
+                    >
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Producto</Table.Th>
+                          <Table.Th>Precio</Table.Th>
+                          <Table.Th>Cantidad</Table.Th>
+                          <Table.Th>Subtotal</Table.Th>
+                          <Table.Th></Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+
+                      <Table.Tbody>
+                        {itemsVenta.map((item) => (
+                          <Table.Tr key={item.productoId}>
+                            <Table.Td>
+                              <Text fw={600}>
+                                {item.nombre}
+                              </Text>
+                            </Table.Td>
+
+                            <Table.Td>
+                              $
+                              {item.precioUnitario.toLocaleString(
+                                "es-AR"
+                              )}
+                            </Table.Td>
+
+                            <Table.Td>
+                              <NumberInput
+                                value={item.cantidad}
+                                onChange={(value) =>
+                                  modificarCantidadItem(
+                                    item.productoId,
+                                    String(value)
+                                  )
+                                }
+                                min={1}
+                                step={1}
+                                w={90}
+                              />
+                            </Table.Td>
+
+                            <Table.Td>
+                              $
+                              {item.subtotal.toLocaleString(
+                                "es-AR"
+                              )}
+                            </Table.Td>
+
+                            <Table.Td>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                color="red"
+                                onClick={() =>
+                                  quitarItemVenta(
+                                    item.productoId
+                                  )
+                                }
+                              >
+                                Quitar
+                              </Button>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
                   )}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+                </div>
 
-        {/* HU-09 - Productos con stock bajo */}
-      <section>
-        <h2>Productos con stock bajo</h2>
+                {itemsVenta.length > 0 && (
+                  <>
+                    <Divider />
 
-        {productosStockBajo.length === 0 ? (
-          <p>No hay productos con stock bajo.</p>
-        ) : (
-          <ul>
-            {productosStockBajo.map((producto) => (
-              <li key={producto.id}>
-                {producto.nombre}
-                {" - "}
-                Stock actual: {producto.stock}
-                {" - "}
-                Stock mínimo: {producto.stockMinimo}
-                {" - "}
-                Categoría: {producto.categoria?.nombre ?? "Sin categoría"}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                    <Group justify="space-between">
+                      <div>
+                        <Text size="sm" c="dimmed">
+                          Total de la venta
+                        </Text>
 
-    </main>
+                        <Title order={2}>
+                          $
+                          {itemsVenta
+                            .reduce(
+                              (total, item) =>
+                                total + item.subtotal,
+                              0
+                            )
+                            .toLocaleString("es-AR")}
+                        </Title>
+                      </div>
+
+                      <Button
+                        size="md"
+                        color="violet"
+                        onClick={crearVenta}
+                      >
+                        Registrar venta
+                      </Button>
+                    </Group>
+                  </>
+                )}
+
+                {mensajeVenta && (
+                  <Text
+                    size="sm"
+                    fw={500}
+                    c={
+                      mensajeVenta.includes("correctamente")
+                        ? "green"
+                        : "red"
+                    }
+                  >
+                    {mensajeVenta}
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* ========================= */}
+          {/* HISTORIAL */}
+          {/* ========================= */}
+
+          {seccionActiva === "historial" && (
+            <Paper
+              withBorder
+              radius="lg"
+              p="xl"
+              shadow="xs"
+            >
+              <Stack gap="lg">
+                <div>
+                  <Title order={2} size="h3">
+                    Historial de ventas
+                  </Title>
+
+                  <Text size="sm" c="dimmed" mt={4}>
+                    Consultá las ventas registradas y su detalle.
+                  </Text>
+                </div>
+
+                {ventas.length === 0 ? (
+                  <Text c="dimmed">
+                    No hay ventas registradas.
+                  </Text>
+                ) : (
+                  <Accordion variant="separated">
+                    {ventas.map((venta) => (
+                      <Accordion.Item
+                        key={venta.id}
+                        value={String(venta.id)}
+                      >
+                        <Accordion.Control>
+                          <Group
+                            justify="space-between"
+                            pr="md"
+                          >
+                            <div>
+                              <Text fw={600}>
+                                Venta #{venta.id}
+                              </Text>
+
+                              <Text
+                                size="xs"
+                                c="dimmed"
+                              >
+                                {new Date(
+                                  venta.fecha
+                                ).toLocaleString(
+                                  "es-AR"
+                                )}
+                              </Text>
+                            </div>
+
+                            <Badge
+                              color="violet"
+                              variant="light"
+                              size="lg"
+                            >
+                              $
+                              {Number(
+                                venta.total
+                              ).toLocaleString(
+                                "es-AR",
+                                {
+                                  minimumFractionDigits: 2,
+                                }
+                              )}
+                            </Badge>
+                          </Group>
+                        </Accordion.Control>
+
+                        <Accordion.Panel>
+                          <Table
+                            withTableBorder
+                            striped
+                            highlightOnHover
+                          >
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>
+                                  Producto
+                                </Table.Th>
+
+                                <Table.Th>
+                                  Cantidad
+                                </Table.Th>
+
+                                <Table.Th>
+                                  Precio unitario
+                                </Table.Th>
+
+                                <Table.Th>
+                                  Subtotal
+                                </Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+
+                            <Table.Tbody>
+                              {venta.detalles.map(
+                                (detalle) => (
+                                  <Table.Tr
+                                    key={detalle.id}
+                                  >
+                                    <Table.Td>
+                                      <Text fw={500}>
+                                        {
+                                          detalle
+                                            .producto
+                                            .nombre
+                                        }
+                                      </Text>
+                                    </Table.Td>
+
+                                    <Table.Td>
+                                      {
+                                        detalle.cantidad
+                                      }
+                                    </Table.Td>
+
+                                    <Table.Td>
+                                      $
+                                      {Number(
+                                        detalle.precioUnitario
+                                      ).toLocaleString(
+                                        "es-AR",
+                                        {
+                                          minimumFractionDigits: 2,
+                                        }
+                                      )}
+                                    </Table.Td>
+
+                                    <Table.Td>
+                                      $
+                                      {Number(
+                                        detalle.subtotal
+                                      ).toLocaleString(
+                                        "es-AR",
+                                        {
+                                          minimumFractionDigits: 2,
+                                        }
+                                      )}
+                                    </Table.Td>
+                                  </Table.Tr>
+                                )
+                              )}
+                            </Table.Tbody>
+                          </Table>
+                        </Accordion.Panel>
+                      </Accordion.Item>
+                    ))}
+                  </Accordion>
+                )}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* ========================= */}
+          {/* STOCK */}
+          {/* ========================= */}
+
+          {seccionActiva === "stock" && (
+            <Stack gap="lg">
+              {productoReposicionId !== null && (
+                <Paper
+                  withBorder
+                  radius="lg"
+                  p="xl"
+                  shadow="xs"
+                >
+                  <Title order={2} size="h3">
+                    Reponer stock
+                  </Title>
+
+                  <Text size="sm" c="dimmed" mt={4} mb="lg">
+                    Ingresá la cantidad que querés agregar al stock actual.
+                  </Text>
+
+                  <form onSubmit={reponerStock}>
+                    <Group align="flex-end">
+                      <NumberInput
+                        label="Cantidad"
+                        value={cantidadReposicion}
+                        onChange={(value) =>
+                          setCantidadReposicion(String(value))
+                        }
+                        min={1}
+                        step={1}
+                        w={180}
+                        required
+                      />
+
+                      <Button
+                        type="submit"
+                        color="violet"
+                      >
+                        Confirmar reposición
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="light"
+                        color="gray"
+                        onClick={() => {
+                          setProductoReposicionId(null);
+                          setCantidadReposicion("");
+                          setMensajeReposicion("");
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    </Group>
+                  </form>
+
+                  {mensajeReposicion && (
+                    <Text
+                      mt="md"
+                      size="sm"
+                      fw={500}
+                      c={
+                        mensajeReposicion.includes("correctamente")
+                          ? "green"
+                          : "red"
+                      }
+                    >
+                      {mensajeReposicion}
+                    </Text>
+                  )}
+                </Paper>
+              )}
+
+              <Paper
+                withBorder
+                radius="lg"
+                p="xl"
+                shadow="xs"
+              >
+                <Group justify="space-between" mb="lg">
+                  <div>
+                    <Title order={2} size="h3">
+                      Productos con stock bajo
+                    </Title>
+
+                    <Text size="sm" c="dimmed" mt={4}>
+                      Productos cuyo stock actual alcanzó o quedó por debajo
+                      del mínimo configurado.
+                    </Text>
+                  </div>
+
+                  <Badge
+                    color={
+                      productosStockBajo.length > 0
+                        ? "red"
+                        : "green"
+                    }
+                    variant="light"
+                    size="lg"
+                  >
+                    {productosStockBajo.length} productos
+                  </Badge>
+                </Group>
+
+                {productosStockBajo.length === 0 ? (
+                  <Text c="dimmed">
+                    No hay productos con stock bajo.
+                  </Text>
+                ) : (
+                  <Table
+                    striped
+                    highlightOnHover
+                    withTableBorder
+                  >
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Producto</Table.Th>
+                        <Table.Th>Categoría</Table.Th>
+                        <Table.Th>Stock actual</Table.Th>
+                        <Table.Th>Stock mínimo</Table.Th>
+                        <Table.Th>Acción</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+
+                    <Table.Tbody>
+                      {productosStockBajo.map((producto) => (
+                        <Table.Tr key={producto.id}>
+                          <Table.Td>
+                            <Text fw={600}>
+                              {producto.nombre}
+                            </Text>
+                          </Table.Td>
+
+                          <Table.Td>
+                            {producto.categoria?.nombre ??
+                              "Sin categoría"}
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Badge
+                              color="red"
+                              variant="light"
+                            >
+                              {producto.stock}
+                            </Badge>
+                          </Table.Td>
+
+                          <Table.Td>
+                            {producto.stockMinimo}
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Button
+                              size="xs"
+                              color="violet"
+                              variant="light"
+                              onClick={() =>
+                                abrirReposicion(producto.id)
+                              }
+                            >
+                              Reponer stock
+                            </Button>
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                )}
+              </Paper>
+            </Stack>
+          )}
+        </Container>
+      </AppShell.Main>
+    </AppShell>
   );
 }
 

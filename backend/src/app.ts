@@ -6,6 +6,7 @@ import "./models";
 import productoRoutes from "./routes/productoRoutes";
 import ventaRoutes from "./routes/ventaRoutes";
 import categoriaRoutes from "./routes/categoriaRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
 
 // Variables de entorno
 dotenv.config();
@@ -22,6 +23,7 @@ app.use("/productos", productoRoutes);
 app.use("/ventas", ventaRoutes);
 // Rutas de categorias
 app.use("/categorias", categoriaRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 // Para chequear rápido que levante la API
 app.get("/", (_req, res) => {
