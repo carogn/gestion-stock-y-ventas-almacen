@@ -68,8 +68,21 @@ type VentaHistorial = {
 };
 
 function App() {
+
+  const [token, setToken] = useState(
+  localStorage.getItem("token") ?? ""
+  );
+
+  const [emailLogin, setEmailLogin] = useState("");
+  const [passwordLogin, setPasswordLogin] = useState("");
+  const [mensajeLogin, setMensajeLogin] = useState("");
   const [seccionActiva, setSeccionActiva] =
     useState<Seccion>("inicio");
+  
+  const cerrarSesion = () => {
+    localStorage.removeItem("token");
+    setToken("");
+  };
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -107,12 +120,55 @@ function App() {
   const [mostrarNuevoProducto, setMostrarNuevoProducto] =
     useState(false);
 
+  const login = async (
+  event: SyntheticEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    try {
+      const response = await fetch(
+        "http://localhost:3000/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            email: emailLogin,
+            password: passwordLogin,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMensajeLogin(
+          data.message || "No se pudo iniciar sesión"
+        );
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setMensajeLogin("");
+    } catch (error) {
+      console.error("Error al iniciar sesión:", error);
+      setMensajeLogin("No se pudo conectar con el servidor");
+    }
+  };
+
   // =========================
   // CARGAS DESDE EL BACKEND
   // =========================
 
   const cargarProductos = () => {
-    fetch("http://localhost:3000/productos")
+    fetch("http://localhost:3000/productos", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((response) => response.json())
       .then((data) => setProductos(data))
       .catch((error) =>
@@ -121,7 +177,11 @@ function App() {
   };
 
   const cargarCategorias = () => {
-    fetch("http://localhost:3000/categorias")
+    fetch("http://localhost:3000/categorias", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((response) => response.json())
       .then((data) => setCategorias(data))
       .catch((error) =>
@@ -130,7 +190,11 @@ function App() {
   };
 
   const cargarVentas = () => {
-    fetch("http://localhost:3000/ventas")
+    fetch("http://localhost:3000/ventas", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((response) => response.json())
       .then((data) => setVentas(data))
       .catch((error) =>
@@ -139,7 +203,11 @@ function App() {
   };
 
   const cargarProductosStockBajo = () => {
-    fetch("http://localhost:3000/productos/stock-bajo")
+    fetch("http://localhost:3000/productos/stock-bajo", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((response) => response.json())
       .then((data) => setProductosStockBajo(data))
       .catch((error) =>
@@ -173,6 +241,7 @@ function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             nombre,
@@ -233,6 +302,7 @@ function App() {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             nombre: nombreEdit,
@@ -266,6 +336,9 @@ function App() {
         `http://localhost:3000/productos/${id}/desactivar`,
         {
           method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
@@ -436,6 +509,7 @@ function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             items: itemsVenta.map((item) => ({
@@ -506,6 +580,7 @@ function App() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             cantidad: Number(cantidadReposicion),
@@ -544,6 +619,68 @@ function App() {
     }
   };
 
+  if (!token) {
+  return (
+    <Container size="xs" py={80}>
+      <Paper
+        withBorder
+        shadow="sm"
+        radius="lg"
+        p="xl"
+      >
+        <Stack>
+          <div>
+            <Title order={2}>
+              Iniciar sesión
+            </Title>
+
+            <Text size="sm" c="dimmed" mt={4}>
+              Ingresá tus credenciales para acceder al sistema.
+            </Text>
+          </div>
+
+          <form onSubmit={login}>
+            <Stack>
+              <TextInput
+                label="Email"
+                placeholder="admin@mandadito.com"
+                value={emailLogin}
+                onChange={(event) =>
+                  setEmailLogin(event.target.value)
+                }
+                required
+              />
+
+              <TextInput
+                label="Contraseña"
+                type="password"
+                value={passwordLogin}
+                onChange={(event) =>
+                  setPasswordLogin(event.target.value)
+                }
+                required
+              />
+
+              <Button
+                type="submit"
+                color="violet"
+              >
+                Ingresar
+              </Button>
+            </Stack>
+          </form>
+
+          {mensajeLogin && (
+            <Text c="red" size="sm">
+              {mensajeLogin}
+            </Text>
+          )}
+        </Stack>
+      </Paper>
+    </Container>
+  );
+}
+
   // =========================
   // INTERFAZ
   // =========================
@@ -559,6 +696,7 @@ function App() {
       <Sidebar
         seccionActiva={seccionActiva}
         cambiarSeccion={setSeccionActiva}
+        cerrarSesion={cerrarSesion}
       />
 
       <AppShell.Main bg="#f8f9fa">
@@ -588,7 +726,7 @@ function App() {
           {/* ========================= */}
 
           {seccionActiva === "inicio" && (
-            <Dashboard />
+            <Dashboard token={token} />
           )}
 
           {/* ========================= */}

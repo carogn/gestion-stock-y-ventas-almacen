@@ -9,12 +9,28 @@ export const crearVenta = async (req: Request, res: Response) => {
   try {
     const { items } = req.body;
 
+
     // Valido que venga al menos un producto
     if (!Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
 
       return res.status(400).json({
         message: "La venta debe contener al menos un producto",
+      });
+    }
+
+    const productosIds = items.map(
+      (item: { productoId: number }) => item.productoId
+    );
+
+    const productosIdsUnicos = new Set(productosIds);
+
+    if (productosIdsUnicos.size !== productosIds.length) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message:
+          "No se puede repetir el mismo producto dentro de una venta",
       });
     }
 

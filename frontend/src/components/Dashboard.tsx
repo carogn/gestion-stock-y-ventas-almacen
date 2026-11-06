@@ -50,7 +50,11 @@ function mostrarFecha(fecha: string) {
   return `${dia}/${mes}/${anio}`;
 }
 
-function Dashboard() {
+type DashboardProps = {
+  token: string;
+};
+
+function Dashboard({ token }: DashboardProps) {
   const [datos, setDatos] =
     useState<DatosDashboard | null>(null);
 
@@ -79,7 +83,12 @@ function Dashboard() {
       }
 
       const response = await fetch(
-        `http://localhost:3000/dashboard?${parametros.toString()}`
+        `http://localhost:3000/dashboard?${parametros.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (!response.ok) {
@@ -107,7 +116,11 @@ function Dashboard() {
   }
 
   useEffect(() => {
-    fetch("http://localhost:3000/dashboard")
+    fetch("http://localhost:3000/dashboard", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
       .then((response) => {
         if (!response.ok) {
           throw new Error(

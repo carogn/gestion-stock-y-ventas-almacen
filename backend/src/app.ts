@@ -3,6 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import database from "./config/database";
 import "./models";
+import authRoutes from "./routes/authRoutes";
+import { verificarToken } from "./middlewares/authMiddleware";
 import productoRoutes from "./routes/productoRoutes";
 import ventaRoutes from "./routes/ventaRoutes";
 import categoriaRoutes from "./routes/categoriaRoutes";
@@ -16,6 +18,13 @@ const app = express();
 // Middlewares básicos
 app.use(cors());
 app.use(express.json());
+
+app.use("/auth", authRoutes);
+
+app.use("/productos", verificarToken, productoRoutes);
+app.use("/ventas", verificarToken, ventaRoutes);
+app.use("/categorias", verificarToken, categoriaRoutes);
+app.use("/dashboard", verificarToken, dashboardRoutes);
 
 // Rutas de productos
 app.use("/productos", productoRoutes);

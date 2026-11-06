@@ -1,3 +1,4 @@
+import Usuario from "./Usuario";
 import Producto from "./Producto";
 import Venta from "./Venta";
 import DetalleVenta from "./DetalleVenta";
@@ -36,4 +37,4 @@ Producto.belongsTo(Categoria, {
   as: "categoria",
 });
 
-export { Producto, Venta, DetalleVenta, Categoria };
+export { Producto, Venta, DetalleVenta, Categoria, Usuario };

@@ -6,6 +6,7 @@ import {
   Stack,
   Text,
   ThemeIcon,
+  Button,
 } from "@mantine/core";
 
 import {
@@ -26,11 +27,13 @@ type Seccion =
 type SidebarProps = {
   seccionActiva: Seccion;
   cambiarSeccion: (seccion: Seccion) => void;
+  cerrarSesion: () => void;
 };
 
 function Sidebar({
   seccionActiva,
   cambiarSeccion,
+  cerrarSesion,
 }: SidebarProps) {
   const opciones = [
     {
@@ -69,11 +72,11 @@ function Sidebar({
             radius="md"
             color="violet"
           >
-            N
+            M
           </ThemeIcon>
 
           <div>
-            <Text fw={700}>Nexo</Text>
+            <Text fw={700}>Mandadito</Text>
 
             <Text size="xs" c="dimmed">
               Gestión comercial
@@ -127,6 +130,16 @@ function Sidebar({
             </Text>
           </div>
         </Group>
+
+        <Button
+          mt="md"
+          variant="light"
+          color="red"
+          fullWidth
+          onClick={cerrarSesion}
+        >
+          Cerrar sesión
+        </Button>
       </AppShell.Section>
     </AppShell.Navbar>
   );
