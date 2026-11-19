@@ -3,7 +3,7 @@
 
 **Proyecto Integrador — Universidad Nacional de Hurlingham (UNAHUR)**
 
-**Desarrollado por:** Carolina González Pisarello
+**Desarrollado por:** Carolina Gonzalez Pisarello
 
 ## Descripción
 
